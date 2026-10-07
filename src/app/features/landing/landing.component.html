@@ -1,0 +1,90 @@
+<div class="page">
+  <header class="header">
+    <span class="brand">58mm</span>
+    <span class="status"><span class="status-dot"></span><span>online</span></span>
+  </header>
+
+  <main class="main">
+    <p class="tagline">uma mensagem por dia. sai impressa em papel, na minha mesa.</p>
+
+    <div class="printer">
+      <div class="paper" [class.paper--printing]="state.status() === 'printing'">
+        <div class="paper-meta">
+          <span>{{ ticketNo() }}</span><span>{{ today() }}</span>
+        </div>
+        <label class="paper-from">
+          <span>de: &#64;</span>
+          <input
+            class="paper-handle"
+            aria-label="seu usuário"
+            placeholder="seu_user"
+            spellcheck="false"
+            [value]="state.handle()"
+            [disabled]="locked()"
+            (input)="onHandle($event)"
+          />
+        </label>
+        <div class="paper-rule"></div>
+        <textarea
+          class="paper-input"
+          aria-label="sua mensagem"
+          placeholder="escreva algo. eu imprimo."
+          spellcheck="false"
+          [value]="state.text()"
+          [rows]="rows()"
+          [maxLength]="config.maxLength"
+          [disabled]="locked()"
+          (input)="onText($event)"
+        ></textarea>
+      </div>
+      <pre class="printer-art" aria-hidden="true">{{ art().before }}<span class="led" [class.led--on]="art().ledOn">{{ art().led }}</span>{{ art().after }}</pre>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="print-btn" [disabled]="cantPrint()" (click)="print()">{{ buttonLabel() }}</button>
+      <button
+        type="button"
+        class="private-toggle"
+        role="checkbox"
+        [attr.aria-checked]="state.isPrivate()"
+        [class.private-toggle--on]="state.isPrivate()"
+        (click)="togglePrivate()"
+      >
+        <span>{{ state.isPrivate() ? '[x]' : '[ ]' }}</span><span>mensagem privada</span>
+      </button>
+      <span class="counter">
+        {{ state.text().length }} / {{ config.maxLength }} ·
+        {{ state.isPrivate() ? 'só eu vou ler. não entra no histórico.' : 'aparece no histórico abaixo.' }}
+      </span>
+    </div>
+
+    @if (config.showStylePicker) {
+      <nav class="style-picker" aria-label="estilo da impressora">
+        <span class="style-picker-label">arte</span>
+        @for (style of artStyles; track style) {
+          <button
+            type="button"
+            class="style-option"
+            [class.style-option--active]="style === state.artStyle()"
+            [attr.aria-pressed]="style === state.artStyle()"
+            (click)="pickStyle(style)"
+          >{{ style }}</button>
+        }
+      </nav>
+    }
+  </main>
+
+  <section class="history">
+    @if (historyCards().length) {
+      <app-receipt-carousel [cards]="historyCards()" />
+    } @else {
+      <p class="history-empty">nada impresso ainda.</p>
+    }
+  </section>
+
+  <footer class="footer">
+    <span>1 impressão por pessoa por dia</span>
+    <span>papel térmico 58mm</span>
+    <span>32 colunas</span>
+  </footer>
+</div>
