@@ -60,14 +60,29 @@ describe('printer-art', () => {
       expect(lines(art)[6]).toContain('1 impressao disponivel hoje');
     });
 
-    it('given every style and status, when rendered, then all 12 lines are 48 columns wide', () => {
-      for (const style of ART_STYLES) {
-        for (const status of ['idle', 'printing', 'done', 'error'] as const) {
+    const FLAT_STYLES = ART_STYLES.filter(s => s !== 'sombra');
+
+    it('given every style but sombra and every status, when rendered, then all 12 lines are 48 columns wide', () => {
+      for (const style of FLAT_STYLES) {
+        for (const status of ['idle', 'printing', 'tearing', 'done', 'error'] as const) {
           const art = renderPrinterArt({ status, tick: 3, remainingMs: 1000, style });
           expect(lines(art).length).withContext(`${style}/${status}`).toBe(12);
           lines(art).forEach(l => expect(l.length).withContext(`${style}/${status}: "${l}"`).toBe(48));
         }
       }
+    });
+
+    it('given sombra, when rendered, then it is the ascii printer with a shadow: 13 lines of 50 columns', () => {
+      const art = lines(renderPrinterArt({ status: 'idle', tick: 0, remainingMs: 0, style: 'sombra' }));
+      expect(art.length).toBe(13);
+      art.forEach(l => expect(l.length).withContext(`"${l}"`).toBe(50));
+      expect(art[5].endsWith('░')).toBeTrue();
+      expect(art[12]).toBe('  ' + '░'.repeat(47) + ' ');
+    });
+
+    it('given tearing status, when rendered, then the screen says it is tearing the paper', () => {
+      const art = renderPrinterArt({ status: 'tearing', tick: 0, remainingMs: 0, style: 'ascii' });
+      expect(lines(art)[5]).toContain('rasgando...');
     });
 
     it('given every style, when rendered idle, then the screen text stays readable', () => {
@@ -77,8 +92,10 @@ describe('printer-art', () => {
       }
     });
 
-    it('given the style list, when read, then offers the six styles of the design in order', () => {
-      expect(ART_STYLES).toEqual(['ascii', 'dots', 'linhas', 'blocos', 'meio-tom', 'retrô']);
+    it('given the style list, when read, then offers the eleven styles of the design in order', () => {
+      expect(ART_STYLES).toEqual([
+        'ascii', 'dots', 'linhas', 'blocos', 'meio-tom', 'retrô', 'duplo', 'hash', 'cantos', 'pontilhado', 'sombra',
+      ]);
     });
 
     it('given printing at tick 3, when rendered, then shows a progress bar of 6 filled cells', () => {

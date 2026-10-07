@@ -1,5 +1,6 @@
 import { InjectionToken } from '@angular/core';
 import { environment } from '../../../environments/environment';
+import { fingerprint } from './utils/fingerprint';
 import { ArtStyle } from './utils/printer-art';
 
 export interface PrintConfig {
@@ -26,4 +27,11 @@ export const PRINT_CONFIG = new InjectionToken<PrintConfig>('PRINT_CONFIG', {
     ignoreLimit: environment.ignorePrintLimit,
     artStyle: 'ascii',
   }),
+});
+
+/** Quem calcula o fingerprint. Token para os testes trocarem o `crypto.subtle` real (que resolve fora
+ *  da zona do Angular e não avança no `fakeAsync`) por uma promise imediata. */
+export const FINGERPRINT_PROVIDER = new InjectionToken<() => Promise<string | null>>('FINGERPRINT_PROVIDER', {
+  providedIn: 'root',
+  factory: () => () => fingerprint(),
 });

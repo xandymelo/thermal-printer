@@ -1,5 +1,8 @@
-export type PrintStatus = 'idle' | 'printing' | 'done' | 'error';
-export const ART_STYLES = ['ascii', 'dots', 'linhas', 'blocos', 'meio-tom', 'retrô'] as const;
+/** `tearing`: impressão terminou e o papel está sendo rasgado (animação antes de `done`). */
+export type PrintStatus = 'idle' | 'printing' | 'tearing' | 'done' | 'error';
+export const ART_STYLES = [
+  'ascii', 'dots', 'linhas', 'blocos', 'meio-tom', 'retrô', 'duplo', 'hash', 'cantos', 'pontilhado', 'sombra',
+] as const;
 export type ArtStyle = (typeof ART_STYLES)[number];
 
 /** Largura do papel de 58mm, em colunas. */
@@ -48,6 +51,8 @@ function screenLines(status: PrintStatus, tick: number, remainingMs: number): [s
       const n = tick % 9;
       return ['imprimindo', '[' + '#'.repeat(n * 2) + '.'.repeat(16 - n * 2) + ']'];
     }
+    case 'tearing':
+      return ['rasgando...', ''];
     case 'done':
       return ['impresso. obrigado.', 'proxima em ' + formatCountdown(remainingMs)];
     case 'error':
@@ -64,7 +69,8 @@ export interface PrinterArtInput {
   style: ArtStyle;
 }
 
-/** O que muda entre estilos: as duas linhas da tela e o LED já desenhado. */
+/** O que muda entre estilos: as duas linhas da tela e o LED já desenhado. Todos têm 12 linhas de
+ *  48 colunas, menos o `sombra`, que soma a sombra: 13 de 50. */
 interface Screen {
   l1: string;
   l2: string;
@@ -83,15 +89,17 @@ const dot = (s: string) => s.replace(/[^ ]/g, '·');
 /** Marca onde o LED entra, para separá-lo do resto do desenho. */
 const LED_MARK = '\u0000\u0000\u0000';
 
-const DRAWINGS: Record<ArtStyle, Drawing> = {
-  ascii: {
+const ASCII: Drawing = {
     led: () => '(o)',
     draw: ({ l1, l2, led }) => [
       full(r('_', 42)), full('/  [' + r('=', 36) + ']  \\'), full('/' + r(' ', 44) + '\\'), '|' + r(' ', 46) + '|',
       '|   .' + r('-', 38) + '.   |', '|   |' + center(l1, SCREEN_WIDTH) + '|   |', '|   |' + center(l2, SCREEN_WIDTH) + '|   |', "|   '" + r('-', 38) + "'   |",
       '|' + r(' ', 46) + '|', '|  ||||||' + r(' ', 30) + led + '     |', '|' + r('_', 46) + '|', " '" + r('-', 44) + "' ",
     ],
-  },
+  };
+
+const DRAWINGS: Record<ArtStyle, Drawing> = {
+  ascii: ASCII,
   // O mesmo desenho do ascii com a moldura pontilhada; a tela e o LED aceso continuam legíveis.
   dots: {
     led: on => (on ? '(o)' : dot('(o)')),
@@ -131,6 +139,46 @@ const DRAWINGS: Record<ArtStyle, Drawing> = {
       full(r('_', 42)), full(".-'[" + r('=', 36) + "]'-."), full(".'" + r(' ', 42) + "'."), '/' + r(' ', 46) + '\\',
       '|     ' + r('_', 36) + '     |', '|    |' + center(l1, 36) + '|    |', '|    |' + center(l2, 36) + '|    |', '|    |' + r('_', 36) + '|    |',
       '|' + r(' ', 46) + '|', '|  //////' + r(' ', 30) + led + '     |', '\\' + r('_', 46) + '/', " '" + r('-', 44) + "' ",
+    ],
+  },
+  duplo: {
+    led: on => (on ? ' ● ' : ' ○ '),
+    draw: ({ l1, l2, led }) => [
+      full('╔' + r('═', 40) + '╗'), full('║ ╚' + r('═', 36) + '╝ ║'), full('╔╩' + r('═', 40) + '╩╗'), '╔═╝' + r(' ', 42) + '╚═╗',
+      '║   ╔' + r('═', 38) + '╗   ║', '║   ║' + center(l1, SCREEN_WIDTH) + '║   ║', '║   ║' + center(l2, SCREEN_WIDTH) + '║   ║', '║   ╚' + r('═', 38) + '╝   ║',
+      '║' + r(' ', 46) + '║', '║  ││││││' + r(' ', 30) + led + '     ║', '╚' + r('═', 46) + '╝', r(' ', 48),
+    ],
+  },
+  hash: {
+    led: () => ' o ',
+    draw: ({ l1, l2, led }) => [
+      full(r('#', 42)), full('## ' + r('-', 36) + ' ##'), full(r('#', 46)), r('#', 48),
+      '#### ' + r(' ', 38) + ' ####', '#### ' + center(l1, SCREEN_WIDTH) + ' ####', '#### ' + center(l2, SCREEN_WIDTH) + ' ####', '#### ' + r(' ', 38) + ' ####',
+      r('#', 48), '##  | | | ' + r('#', 30) + led + r('#', 5), r('#', 48), ' ' + r("'", 46) + ' ',
+    ],
+  },
+  cantos: {
+    led: () => '(o)',
+    draw: ({ l1, l2, led }) => [
+      full('+' + r('-', 40) + '+'), full('| [' + r('_', 36) + '] |'), '+' + r('-', 46) + '+', '|' + r(' ', 46) + '|',
+      '|   +' + r('-', 38) + '+   |', '|   |' + center(l1, SCREEN_WIDTH) + '|   |', '|   |' + center(l2, SCREEN_WIDTH) + '|   |', '|   +' + r('-', 38) + '+   |',
+      '|' + r(' ', 46) + '|', '|  [::::]' + r(' ', 30) + led + '     |', '+' + r('-', 46) + '+', full('+-+' + r(' ', 38) + '+-+'),
+    ],
+  },
+  pontilhado: {
+    led: () => ' o ',
+    draw: ({ l1, l2, led }) => [
+      full(r('.', 42)), full(': [' + r(':', 36) + '] :'), full('.:' + r(' ', 42) + ':.'), ':' + r(' ', 46) + ':',
+      ':   ' + r('.', 40) + '   :', ':   :' + center(l1, SCREEN_WIDTH) + ':   :', ':   :' + center(l2, SCREEN_WIDTH) + ':   :', ':   ' + r("'", 40) + '   :',
+      ':' + r(' ', 46) + ':', ':  ::::::' + r(' ', 30) + led + '     :', ':' + r('.', 46) + ':', ' ' + r("'", 46) + ' ',
+    ],
+  },
+  // O ascii com sombra projetada à direita e embaixo — por isso é o único com 13×50.
+  sombra: {
+    led: () => '(o)',
+    draw: screen => [
+      ...ASCII.draw(screen).map((row, i) => ' ' + row + (i >= 2 ? '░' : ' ')),
+      '  ' + r('░', 47) + ' ',
     ],
   },
 };

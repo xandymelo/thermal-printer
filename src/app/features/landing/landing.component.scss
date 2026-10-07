@@ -63,50 +63,118 @@ $faint: #999;
   text-wrap: pretty;
 }
 
-/* Sem overflow próprio: a arte não rola. Em tela estreita a fonte encolhe para os 48 caracteres
-   caberem (IBM Plex Mono ≈ 0.6em por caractere → 48 × 0.6 = 28.8em), e papel e arte escalam juntos
-   porque são medidos em ch/em. */
+/* `overflow: clip` corta a folha que voa ao ser rasgada sem virar área de rolagem. O padding de 160px
+   em cima (compensado pela margem negativa) é o espaço do voo antes do corte.
+   Em tela estreita a fonte encolhe para a arte caber: IBM Plex Mono ≈ 0.6em por caractere e o maior
+   desenho (sombra) tem 50 colunas → 30em. Papel e arte escalam juntos porque são medidos em ch/em. */
 .printer {
   display: flex;
   flex-direction: column;
   align-items: center;
   max-width: 100%;
-  font-size: min(14px, calc((100vw - 32px) / 28.8));
+  overflow: clip;
+  padding: 160px 0 4px;
+  margin-top: -160px;
+  font-size: min(14px, calc((100vw - 32px) / 30));
+}
+
+$receipt-font: 'Courier Prime', 'Courier New', Courier, monospace;
+$stub-height: calc(1.2em + 18px);
+/* Borda de cima do papel, rasgada na impressão anterior. */
+$torn-top: 0 5px, 3% 1px, 6% 7px, 10% 2px, 13% 6px, 17% 0, 21% 5px, 24% 2px, 28% 8px, 32% 3px, 35% 6px,
+  39% 1px, 43% 7px, 47% 2px, 50% 5px, 54% 0, 58% 6px, 61% 3px, 65% 8px, 69% 2px, 72% 6px, 76% 1px, 80% 5px,
+  84% 2px, 87% 7px, 91% 1px, 95% 6px, 98% 2px, 100% 5px;
+/* Borda de baixo no instante do rasgo, da direita para a esquerda. */
+$torn-bottom: 100% calc(100% - 4px), 97% 100%, 94% calc(100% - 6px), 90% calc(100% - 1px), 86% calc(100% - 7px),
+  83% calc(100% - 2px), 79% calc(100% - 8px), 75% calc(100% - 1px), 71% calc(100% - 5px), 68% 100%,
+  64% calc(100% - 6px), 60% calc(100% - 2px), 57% calc(100% - 8px), 53% calc(100% - 1px), 49% calc(100% - 6px),
+  46% calc(100% - 2px), 42% calc(100% - 7px), 38% 100%, 35% calc(100% - 5px), 31% calc(100% - 1px),
+  27% calc(100% - 7px), 24% calc(100% - 2px), 20% calc(100% - 6px), 16% 100%, 13% calc(100% - 5px),
+  9% calc(100% - 1px), 6% calc(100% - 7px), 2% calc(100% - 2px), 0 calc(100% - 5px);
+
+.paper-slot {
+  position: relative;
+  z-index: 1;
+  width: 36ch;
+  min-height: $stub-height;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.paper-stub {
+  position: absolute;
+  inset: auto 0 0;
+  height: $stub-height;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+}
+
+.paper-stub-edge {
+  height: 100%;
+  background: #fff;
+  clip-path: polygon(#{$torn-top}, 100% 100%, 0 100%);
 }
 
 .paper {
   position: relative;
   z-index: 1;
-  width: 36ch;
-  box-sizing: border-box;
-  background: #fff;
-  border: 1px solid $ink;
-  border-bottom: none;
-  padding: 14px 2ch 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transform-origin: 30% 100%;
   transform: translateY(0);
-  transition: transform 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition:
+    transform 0.9s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.9s ease-in;
 
   &--printing {
     transform: translateY(-24px);
   }
+
+  &--tearing {
+    transform: translate(-18px, -130px) rotate(-9deg);
+    opacity: 0;
+
+    .receipt {
+      clip-path: polygon(#{$torn-top}, #{$torn-bottom});
+    }
+  }
 }
 
-.paper-meta {
+.receipt {
+  font-family: $receipt-font;
+  background: #fff;
+  padding: 22px 2ch 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  clip-path: polygon(#{$torn-top}, 100% 100%, 0 100%);
+}
+
+.receipt-header {
+  text-align: center;
+  letter-spacing: 0.1em;
+  font-weight: 500;
+}
+
+.receipt-meta {
   display: flex;
   justify-content: space-between;
-  color: $faint;
+  color: #888;
+  font-size: 13px;
 }
 
-.paper-from {
+.receipt-rule {
+  border-top: 1px dashed #bbb;
+}
+
+.receipt-from {
   display: flex;
   align-items: baseline;
-  color: $faint;
+  color: #888;
 }
 
-.paper-handle {
+.receipt-handle {
   flex: 1;
   min-width: 0;
   padding: 0;
@@ -122,12 +190,8 @@ $faint: #999;
   }
 }
 
-.paper-rule {
-  border-top: 1px dashed #bbb;
-}
-
 /* 32ch = 32 colunas do papel de 58mm. */
-.paper-input {
+.receipt-input {
   width: 32ch;
   box-sizing: content-box;
   padding: 0;
@@ -149,6 +213,21 @@ $faint: #999;
   &:focus {
     outline: none;
   }
+}
+
+.receipt-barcode {
+  text-align: center;
+  letter-spacing: -0.5px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* O padding de baixo é a parte do papel que fica escondida atrás da fenda. */
+.receipt-footnote {
+  text-align: center;
+  color: #888;
+  font-size: 12px;
+  padding-bottom: 1.2em;
 }
 
 /* A margem negativa enfia a base do papel na fenda da impressora. */
@@ -191,6 +270,39 @@ $faint: #999;
 
   &:disabled {
     opacity: 0.3;
+    cursor: default;
+  }
+}
+
+.symbol-picker {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.symbol-picker-label {
+  color: $faint;
+  margin-right: 6px;
+}
+
+.symbol-option {
+  font: inherit;
+  width: 36px;
+  height: 36px;
+  background: #fff;
+  color: $ink;
+  border: 1px solid $ink;
+  cursor: pointer;
+
+  &--active {
+    background: $ink;
+    color: #fff;
+  }
+
+  &:disabled {
     cursor: default;
   }
 }

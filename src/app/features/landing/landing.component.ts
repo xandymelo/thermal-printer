@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject } from '@angular/core';
 import { ReceiptCarouselComponent } from './components/receipt-carousel.component';
 import { PRINT_CONFIG } from './print.config';
-import { PrintService } from './services/print.service';
+import { PrintService, SYMBOLS } from './services/print.service';
 import { PrintState } from './states/print.state';
 import { toHistoryCards } from './utils/history';
 import { ART_STYLES, ArtStyle, countRows, formatTicketDate, printerArtParts, ticketNumber } from './utils/printer-art';
@@ -19,6 +19,7 @@ export class LandingComponent implements OnInit, OnDestroy {
   protected state = inject(PrintState);
   protected config = inject(PRINT_CONFIG);
   protected readonly artStyles = ART_STYLES;
+  protected readonly symbols = SYMBOLS;
 
   protected locked = computed(() => this.state.status() !== 'idle');
   protected cantPrint = computed(() => this.locked() || !this.state.text().trim());
@@ -66,6 +67,10 @@ export class LandingComponent implements OnInit, OnDestroy {
 
   protected togglePrivate(): void {
     this.printService.togglePrivate();
+  }
+
+  protected pickSymbol(symbol: string): void {
+    this.printService.setSymbol(symbol);
   }
 
   protected pickStyle(style: ArtStyle): void {

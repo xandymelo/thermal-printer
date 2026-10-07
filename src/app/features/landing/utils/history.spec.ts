@@ -2,7 +2,7 @@ import { toHistoryCards } from './history';
 
 describe('history', () => {
   const entries = [
-    { text: 'terceira', handle: 'eliza', at: new Date(2026, 9, 7, 9, 5).getTime() },
+    { text: 'terceira', handle: 'eliza', sym: '♥', at: new Date(2026, 9, 7, 9, 5).getTime() },
     { text: 'segunda', handle: '', at: new Date(2026, 9, 6, 22, 30).getTime() },
     { text: 'primeira', handle: 'ana', at: new Date(2026, 9, 5, 8, 0).getTime() },
   ];
@@ -23,5 +23,13 @@ describe('history', () => {
 
   it('given an entry timestamp, when mapped, then formats the date as dd.mm.yy  hh:mm', () => {
     expect(toHistoryCards(entries, 1)[0].date).toBe('07.10.26  09:05');
+  });
+
+  it('given an entry with a symbol, when mapped, then frames the header with it', () => {
+    expect(toHistoryCards(entries, 1)[0].header).toBe('♥ 58mm ♥');
+  });
+
+  it('given an entry without symbol, when mapped, then frames the header with *', () => {
+    expect(toHistoryCards(entries, 2)[1].header).toBe('* 58mm *');
   });
 });

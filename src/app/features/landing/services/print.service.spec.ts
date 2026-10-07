@@ -1,14 +1,17 @@
-import { TestBed, discardPeriodicTasks, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed, discardPeriodicTasks, fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { PRINT_CONFIG, PrintConfig } from '../print.config';
+import { FINGERPRINT_PROVIDER, PRINT_CONFIG, PrintConfig } from '../print.config';
 import { PrintState } from '../states/print.state';
-import { HISTORY_KEY, PRINT_ANIMATION_MS, PRINT_LIMIT_KEY, PrintService } from './print.service';
+import { HISTORY_KEY, PRINT_ANIMATION_MS, PRINT_LIMIT_KEY, PrintService, TEAR_ANIMATION_MS } from './print.service';
 
 describe('PrintService', () => {
   let service: PrintService;
   let state: PrintState;
   let http: HttpTestingController;
+
+  const FP = 'a'.repeat(64);
+  let fingerprintResult: string | null;
 
   const setup = (config: Partial<PrintConfig> = {}) => {
     TestBed.configureTestingModule({
@@ -17,6 +20,7 @@ describe('PrintService', () => {
         provideHttpClientTesting(),
         PrintState,
         PrintService,
+        { provide: FINGERPRINT_PROVIDER, useValue: () => Promise.resolve(fingerprintResult) },
         {
           provide: PRINT_CONFIG,
           useValue: {
@@ -42,7 +46,10 @@ describe('PrintService', () => {
     localStorage.removeItem(HISTORY_KEY);
   };
 
-  beforeEach(clearStorage);
+  beforeEach(() => {
+    clearStorage();
+    fingerprintResult = FP;
+  });
   afterEach(() => {
     service?.stop();
     clearStorage();
@@ -75,13 +82,17 @@ describe('PrintService', () => {
     expect(state.status()).toBe('idle');
   });
 
-  it('given no endpoint, when printing, then animates and locks until midnight', fakeAsync(() => {
+  it('given no endpoint, when printing, then animates, tears the paper and locks until midnight', fakeAsync(() => {
     setup();
     service.setText('oi');
     service.print();
     expect(state.status()).toBe('printing');
     tick(PRINT_ANIMATION_MS);
+    expect(state.status()).toBe('tearing');
+    expect(state.text()).toBe('oi');
+    tick(TEAR_ANIMATION_MS);
     expect(state.status()).toBe('done');
+    expect(state.text()).toBe('');
     expect(Number(localStorage.getItem(PRINT_LIMIT_KEY))).toBeGreaterThan(Date.now());
   }));
 
@@ -89,11 +100,12 @@ describe('PrintService', () => {
     setup({ endpoint: '/api/print' });
     service.setText('  oi  ');
     service.print();
+    flushMicrotasks();
     const req = http.expectOne('/api/print');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ text: 'oi', handle: '', private: false });
+    expect(req.request.body).toEqual({ text: 'oi', handle: '', symbol: '*', private: false, fingerprint: FP });
     req.flush({});
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
     expect(state.status()).toBe('done');
   }));
 
@@ -101,6 +113,7 @@ describe('PrintService', () => {
     setup({ endpoint: '/api/print' });
     service.setText('oi');
     service.print();
+    flushMicrotasks();
     http.expectOne('/api/print').flush('fail', { status: 500, statusText: 'Server Error' });
     tick(PRINT_ANIMATION_MS);
     expect(state.status()).toBe('error');
@@ -114,10 +127,10 @@ describe('PrintService', () => {
     service.start();
     service.setText('oi');
     service.print();
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
     expect(state.status()).toBe('done');
     expect(localStorage.getItem(PRINT_LIMIT_KEY)).toBeNull();
-    tick(4500);
+    tick(5500);
     expect(state.status()).toBe('idle');
     expect(state.text()).toBe('');
     discardPeriodicTasks();
@@ -135,7 +148,7 @@ describe('PrintService', () => {
     service.print();
     service.togglePrivate();
     expect(state.isPrivate()).toBeFalse();
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
   }));
 
   it('given a public print, when it succeeds, then it goes to the top of the stored history', fakeAsync(() => {
@@ -145,12 +158,13 @@ describe('PrintService', () => {
     service.setHandle('eliza');
     service.setText('nova');
     service.print();
+    flushMicrotasks();
     const req = http.expectOne('/api/print');
-    expect(req.request.body).toEqual({ text: 'nova', handle: 'eliza', private: false });
+    expect(req.request.body).toEqual(jasmine.objectContaining({ text: 'nova', handle: 'eliza', symbol: '*', private: false }));
     req.flush({});
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
     expect(state.history().map(h => h.text)).toEqual(['nova', 'velha']);
-    expect(JSON.parse(localStorage.getItem(HISTORY_KEY)!)[0]).toEqual(jasmine.objectContaining({ text: 'nova', handle: 'eliza' }));
+    expect(JSON.parse(localStorage.getItem(HISTORY_KEY)!)[0]).toEqual(jasmine.objectContaining({ text: 'nova', handle: 'eliza', sym: '*' }));
     discardPeriodicTasks();
   }));
 
@@ -159,7 +173,7 @@ describe('PrintService', () => {
     service.togglePrivate();
     service.setText('segredo');
     service.print();
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
     expect(state.history()).toEqual([]);
     expect(localStorage.getItem(HISTORY_KEY)).toBeNull();
   }));
@@ -171,7 +185,7 @@ describe('PrintService', () => {
     service.start();
     service.setText('nova');
     service.print();
-    tick(PRINT_ANIMATION_MS);
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
     expect(state.history().length).toBe(100);
     expect(state.history()[0].text).toBe('nova');
     discardPeriodicTasks();
@@ -206,4 +220,47 @@ describe('PrintService', () => {
     service.setArtStyle('blocos');
     expect(state.artStyle()).toBe('blocos');
   });
+
+  it('given a symbol is picked, when printing, then it goes in the request and in the history', fakeAsync(() => {
+    setup({ endpoint: '/api/print' });
+    service.setSymbol('✦');
+    service.setText('oi');
+    service.print();
+    flushMicrotasks();
+    const req = http.expectOne('/api/print');
+    expect(req.request.body.symbol).toBe('✦');
+    req.flush({});
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
+    expect(state.history()[0].sym).toBe('✦');
+  }));
+
+  it('given a locked printer, when picking a symbol, then nothing changes', fakeAsync(() => {
+    setup();
+    service.setText('oi');
+    service.print();
+    service.setSymbol('♥');
+    expect(state.symbol()).toBe('*');
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
+  }));
+
+  it('given ignoreLimit and a stored limit, when started, then clears it and begins idle', () => {
+    localStorage.setItem(PRINT_LIMIT_KEY, String(Date.now() + 60_000));
+    setup({ ignoreLimit: true });
+    service.start();
+    expect(state.status()).toBe('idle');
+    expect(localStorage.getItem(PRINT_LIMIT_KEY)).toBeNull();
+  });
+
+  it('given the browser cannot compute a fingerprint, when printing, then still prints without the field', fakeAsync(() => {
+    fingerprintResult = null;
+    setup({ endpoint: '/api/print' });
+    service.setText('oi');
+    service.print();
+    flushMicrotasks();
+    const req = http.expectOne('/api/print');
+    expect('fingerprint' in req.request.body).toBeFalse();
+    req.flush({});
+    tick(PRINT_ANIMATION_MS + TEAR_ANIMATION_MS);
+    expect(state.status()).toBe('done');
+  }));
 });

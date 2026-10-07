@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { EMPTY, Subscription, catchError, concatMap, interval, map, of, timer } from 'rxjs';
+import { EMPTY, Subscription, catchError, concatMap, from, interval, map, of, switchMap, timer } from 'rxjs';
 import { PrintApi } from '../apis/print.api';
-import { PRINT_CONFIG } from '../print.config';
+import { FINGERPRINT_PROVIDER, PRINT_CONFIG } from '../print.config';
 import { PrintState } from '../states/print.state';
 import { HistoryEntry } from '../utils/history';
 import { ArtStyle, nextMidnight } from '../utils/printer-art';
@@ -10,9 +10,12 @@ export const PRINT_LIMIT_KEY = 'termica58_next';
 export const HISTORY_KEY = 'termica58_hist';
 /** Tempo da animação de impressão — o papel sobe enquanto a barra enche. */
 export const PRINT_ANIMATION_MS = 2200;
+/** Tempo do papel rasgando e voando antes de sumir (casa com a transition de 0.9s do CSS). */
+export const TEAR_ANIMATION_MS = 950;
+export const SYMBOLS = ['*', '✦', '♥', '☺', '♪', '✿', '☼', '◆', '☾', '#'] as const;
 const CLOCK_MS = 250;
 const ERROR_RESET_MS = 3000;
-const IGNORE_LIMIT_COOLDOWN_MS = 4000;
+const IGNORE_LIMIT_COOLDOWN_MS = 5000;
 const HISTORY_MAX = 100;
 const HANDLE_MAX = 24;
 
@@ -20,6 +23,7 @@ const HANDLE_MAX = 24;
 export class PrintService {
   private api = inject(PrintApi);
   private config = inject(PRINT_CONFIG);
+  private fingerprint = inject(FINGERPRINT_PROVIDER);
   readonly state = inject(PrintState);
   private clock?: Subscription;
 
@@ -28,6 +32,7 @@ export class PrintService {
   }
 
   start(): void {
+    if (this.config.ignoreLimit) this.removeStorage(PRINT_LIMIT_KEY);
     const next = this.readLimit();
     if (next && next > Date.now()) {
       this.state.setNext(next);
@@ -54,6 +59,11 @@ export class PrintService {
     this.state.setPrivate(!this.state.isPrivate());
   }
 
+  setSymbol(symbol: string): void {
+    if (this.state.status() !== 'idle') return;
+    this.state.setSymbol(symbol);
+  }
+
   setArtStyle(style: ArtStyle): void {
     this.state.setArtStyle(style);
   }
@@ -63,11 +73,7 @@ export class PrintService {
     if (!text || this.state.status() !== 'idle') return;
     this.state.setStatus('printing');
 
-    const request$ = this.config.endpoint
-      ? this.api
-          .print(this.config.endpoint, { text, handle: this.state.handle(), private: this.state.isPrivate() })
-          .pipe(map(() => true))
-      : of(true);
+    const request$ = this.config.endpoint ? this.sendPrint(this.config.endpoint, text) : of(true);
 
     request$
       .pipe(
@@ -77,9 +83,26 @@ export class PrintService {
       .subscribe(ok => (ok ? this.onPrinted(text) : this.onFailed()));
   }
 
+  /** Calcula o fingerprint só na hora de imprimir (clique do usuário), nunca durante a renderização. */
+  private sendPrint(endpoint: string, text: string) {
+    return from(this.fingerprint()).pipe(
+      catchError(() => of(null)),
+      switchMap(fingerprint =>
+        this.api.print(endpoint, {
+          text,
+          handle: this.state.handle(),
+          symbol: this.state.symbol(),
+          private: this.state.isPrivate(),
+          ...(fingerprint ? { fingerprint } : {}),
+        }),
+      ),
+      map(() => true),
+    );
+  }
+
   private onPrinted(text: string): void {
     if (!this.state.isPrivate()) {
-      const entry: HistoryEntry = { text, handle: this.state.handle(), at: Date.now() };
+      const entry: HistoryEntry = { text, handle: this.state.handle(), sym: this.state.symbol(), at: Date.now() };
       const history = [entry, ...this.state.history()].slice(0, HISTORY_MAX);
       this.state.setHistory(history);
       this.writeStorage(HISTORY_KEY, JSON.stringify(history));
@@ -91,7 +114,11 @@ export class PrintService {
       this.writeStorage(PRINT_LIMIT_KEY, String(next));
       this.state.setNext(next);
     }
-    this.state.setStatus('done');
+    this.state.setStatus('tearing');
+    timer(TEAR_ANIMATION_MS).subscribe(() => {
+      this.state.setStatus('done');
+      this.state.setText('');
+    });
   }
 
   /** Mostra o histórico local na hora; se houver endpoint, a versão remota substitui quando chegar. */
@@ -137,6 +164,14 @@ export class PrintService {
       return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
+    }
+  }
+
+  private removeStorage(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* nada a limpar */
     }
   }
 

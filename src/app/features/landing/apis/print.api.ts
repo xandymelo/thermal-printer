@@ -6,7 +6,10 @@ import { HistoryEntry } from '../utils/history';
 export interface PrintRequest {
   text: string;
   handle: string;
+  symbol: string;
   private: boolean;
+  /** SHA-256 dos dados do navegador (ver `utils/fingerprint`). Ausente se não deu para calcular. */
+  fingerprint?: string;
 }
 
 @Injectable({ providedIn: 'root' })
