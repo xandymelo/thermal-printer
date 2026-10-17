@@ -109,6 +109,16 @@ describe('printer-art', () => {
       expect(lines(art)[6]).toContain('proxima em 00:01:05');
     });
 
+    it('given offline status, when rendered, then the screen says the printer is offline', () => {
+      const art = renderPrinterArt({ status: 'offline', tick: 0, remainingMs: 0, style: 'ascii' });
+      expect(art).toContain('offline');
+      expect(art).toContain('obrigado pelas mensagens');
+    });
+
+    it('given offline status on an odd tick, when split, then the LED stays off', () => {
+      expect(printerArtParts({ status: 'offline', tick: 1, remainingMs: 0, style: 'ascii' }).ledOn).toBeFalse();
+    });
+
     it('given error status, when rendered, then asks to try again', () => {
       const art = renderPrinterArt({ status: 'error', tick: 0, remainingMs: 0, style: 'ascii' });
       expect(lines(art)[5]).toContain('sem papel?');

@@ -1,5 +1,6 @@
-/** `tearing`: impressão terminou e o papel está sendo rasgado (animação antes de `done`). */
-export type PrintStatus = 'idle' | 'printing' | 'tearing' | 'done' | 'error';
+/** `tearing`: impressão terminou e o papel está sendo rasgado (animação antes de `done`).
+ *  `offline`: a impressora foi aposentada; o site virou só o arquivo das fotos. */
+export type PrintStatus = 'idle' | 'printing' | 'tearing' | 'done' | 'error' | 'offline';
 export const ART_STYLES = [
   'ascii', 'dots', 'linhas', 'blocos', 'meio-tom', 'retrô', 'duplo', 'hash', 'cantos', 'pontilhado', 'sombra',
 ] as const;
@@ -57,6 +58,8 @@ function screenLines(status: PrintStatus, tick: number, remainingMs: number): [s
       return ['impresso. obrigado.', 'proxima em ' + formatCountdown(remainingMs)];
     case 'error':
       return ['sem papel?', 'tente de novo'];
+    case 'offline':
+      return ['offline.', 'obrigado pelas mensagens'];
     default:
       return ['pronta', '1 impressao disponivel hoje'];
   }

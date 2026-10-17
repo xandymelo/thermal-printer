@@ -1,0 +1,79 @@
+$ink: #111;
+
+:host {
+  display: block;
+  width: 100%;
+  max-width: 1100px;
+}
+
+.archive {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* O padding lateral centraliza a primeira e a última foto (até 280px de largura). */
+.track {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding: 24px max(16px, calc(50% - 140px));
+  background: #f3f3f1;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.photo {
+  flex: 0 0 min(280px, 78vw);
+  margin: 0;
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  a {
+    display: block;
+    line-height: 0;
+  }
+
+  img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9 / 16;
+    object-fit: cover;
+    background: #e6e6e3;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.08));
+  }
+
+  figcaption {
+    font-family: 'Courier Prime', 'Courier New', Courier, monospace;
+    font-size: 12px;
+    color: #888;
+    text-align: center;
+  }
+}
+
+.nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+
+  button {
+    font: inherit;
+    width: 44px;
+    height: 44px;
+    background: #fff;
+    border: 1px solid $ink;
+    cursor: pointer;
+    color: $ink;
+
+    &:hover {
+      background: $ink;
+      color: #fff;
+    }
+  }
+}

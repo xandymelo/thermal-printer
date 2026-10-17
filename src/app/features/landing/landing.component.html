@@ -1,115 +1,40 @@
 <div class="page">
   <header class="header">
     <span class="brand">58mm</span>
-    <span class="status"><span class="status-dot"></span><span>online</span></span>
+    <span class="status"><span class="status-dot"></span><span>offline</span></span>
   </header>
 
   <main class="main">
-    <p class="tagline">uma mensagem por dia. sai impressa em papel, na minha mesa.</p>
+    <p class="tagline">
+      em outubro de 2026, qualquer um podia mandar uma mensagem por dia, e ela saía impressa em papel, na minha mesa.
+      foram mais de 80 cupons. a impressora desligou; ficaram as fotos.
+    </p>
 
     <div class="printer">
       <div class="paper-slot">
-        <!-- Toco de papel que fica na impressora depois que a folha é rasgada. -->
+        <!-- Toco de papel que ficou na impressora depois do último cupom. -->
         <div class="paper-stub"><div class="paper-stub-edge"></div></div>
-
-        @if (state.status() !== 'done') {
-          <div
-            class="paper"
-            [class.paper--printing]="state.status() === 'printing'"
-            [class.paper--tearing]="state.status() === 'tearing'"
-          >
-            <div class="receipt">
-              <div class="receipt-header">{{ state.symbol() }} 58mm {{ state.symbol() }}</div>
-              <div class="receipt-meta">
-                <span>{{ ticketNo() }}</span><span>{{ today() }}</span>
-              </div>
-              <div class="receipt-rule"></div>
-              <label class="receipt-from">
-                <span>de: &#64;</span>
-                <input
-                  class="receipt-handle"
-                  aria-label="seu usuário"
-                  placeholder="seu_user"
-                  spellcheck="false"
-                  [value]="state.handle()"
-                  [disabled]="locked()"
-                  (input)="onHandle($event)"
-                />
-              </label>
-              <textarea
-                class="receipt-input"
-                aria-label="sua mensagem"
-                placeholder="escreva algo. eu imprimo."
-                spellcheck="false"
-                [value]="state.text()"
-                [rows]="rows()"
-                [maxLength]="config.maxLength"
-                [disabled]="locked()"
-                (input)="onText($event)"
-              ></textarea>
-              <div class="receipt-rule"></div>
-              <div class="receipt-barcode" aria-hidden="true">|| ||| | |||| || | ||| || ||||</div>
-              <div class="receipt-footnote">impresso em papel térmico</div>
-            </div>
-          </div>
-        }
       </div>
-      <pre class="printer-art" aria-hidden="true">{{ art().before }}<span class="led" [class.led--on]="art().ledOn">{{ art().led }}</span>{{ art().after }}</pre>
+      <pre class="printer-art" aria-hidden="true">{{ art().before }}<span class="led">{{ art().led }}</span>{{ art().after }}</pre>
     </div>
 
-    <div class="actions">
-      <button type="button" class="print-btn" [disabled]="cantPrint()" (click)="print()">{{ buttonLabel() }}</button>
-      <button
-        type="button"
-        class="private-toggle"
-        role="checkbox"
-        [attr.aria-checked]="state.isPrivate()"
-        [class.private-toggle--on]="state.isPrivate()"
-        (click)="togglePrivate()"
-      >
-        <span>{{ state.isPrivate() ? '[x]' : '[ ]' }}</span><span>mensagem privada</span>
-      </button>
-      <div class="symbol-picker" role="group" aria-label="símbolo do cupom">
-        <span class="symbol-picker-label">símbolo</span>
-        @for (symbol of symbols; track symbol) {
-          <button
-            type="button"
-            class="symbol-option"
-            [class.symbol-option--active]="symbol === state.symbol()"
-            [attr.aria-pressed]="symbol === state.symbol()"
-            [disabled]="locked()"
-            (click)="pickSymbol(symbol)"
-          >{{ symbol }}</button>
-        }
-      </div>
-      <span class="counter">
-        {{ state.text().length }} / {{ config.maxLength }} ·
-        {{ state.isPrivate() ? 'só eu vou ler. não entra no histórico.' : 'aparece no histórico abaixo.' }}
-      </span>
-    </div>
-
-    @if (config.showStylePicker) {
-      <nav class="style-picker" aria-label="estilo da impressora">
-        <span class="style-picker-label">arte</span>
-        @for (style of artStyles; track style) {
-          <button
-            type="button"
-            class="style-option"
-            [class.style-option--active]="style === state.artStyle()"
-            [attr.aria-pressed]="style === state.artStyle()"
-            (click)="pickStyle(style)"
-          >{{ style }}</button>
-        }
-      </nav>
-    }
+    <nav class="style-picker" aria-label="estilo da impressora">
+      <span class="style-picker-label">arte</span>
+      @for (style of artStyles; track style) {
+        <button
+          type="button"
+          class="style-option"
+          [class.style-option--active]="style === artStyle()"
+          [attr.aria-pressed]="style === artStyle()"
+          (click)="pickStyle(style)"
+        >{{ style }}</button>
+      }
+    </nav>
   </main>
 
-  <section class="history">
-    @if (historyCards().length) {
-      <app-receipt-carousel [cards]="historyCards()" />
-    } @else {
-      <p class="history-empty">nada impresso ainda.</p>
-    }
+  <section class="history" aria-label="fotos dos cupons impressos">
+    <h2 class="history-title">o que saiu impresso</h2>
+    <app-photo-archive [photos]="photos" />
   </section>
 
   <footer class="footer">
